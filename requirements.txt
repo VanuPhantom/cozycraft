@@ -1,0 +1,2 @@
+portablemc==4.4.0
+PyTermGUI==7.7.2
