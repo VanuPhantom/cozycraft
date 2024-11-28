@@ -2,7 +2,6 @@ from portablemc.standard import Version
 import pytermgui as ptg
 
 from versions import VersionList, VersionProvider
-from versions import VersionList, VersionProvider
 
 version_provider = VersionProvider()
 selected_version = None
