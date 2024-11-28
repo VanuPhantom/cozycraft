@@ -1,17 +1,28 @@
+from portablemc.standard import Version
 import pytermgui as ptg
 
 from versions import VersionList, VersionProvider
+from versions import VersionList, VersionProvider
 
 version_provider = VersionProvider()
+selected_version = None
 
-with ptg.WindowManager() as manager:
+class FixedWindowManager(ptg.WindowManager):
+    def __init__(self, **args):
+        super().__init__(**args)
+
+    def on_resize(self, size):
+        if self._is_running:
+            super().on_resize(size)
+
+with FixedWindowManager(autorun=False) as manager:
     selector_window = ptg.Window()
 
     def on_select(version_id: str) -> None:
-        global selector_window, manager
+        global manager, selected_version, selector_window
 
-        selector_window.close()
-        manager.add(ptg.Window(version_id))
+        selected_version = version_id
+        manager.stop()
 
     manager.layout.add_slot("Body")
 
@@ -19,4 +30,12 @@ with ptg.WindowManager() as manager:
     manager.add(
             selector_window
     )
+    manager.run()
+
+if selected_version is not None:
+    print(f"\r\nLaunching {selected_version}")
+    Version(selected_version).install().run()
+    print("\r\nThanks for using Cozycraft. Goodbye!")
+else:
+    print(f"\r\nNo version selected. Exiting...")
 
