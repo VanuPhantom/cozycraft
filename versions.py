@@ -1,8 +1,7 @@
 from typing import Callable, Union, cast
 
 import portablemc.standard
-from pytermgui import Button, Container, Splitter, Widget, keys
-from pytermgui import tim
+from pytermgui import Button, Container, Splitter, Widget, keys, tim
 
 class VersionProvider:
     def __init__(self):
