@@ -1,7 +1,7 @@
-from typing import Callable, Union, cast
+from typing import Callable, Tuple
 
 import portablemc.standard
-from pytermgui import Button, Container, Splitter, Widget, keys, tim
+from pytermgui import HorizontalAlignment, Widget, keys, tim
 
 
 class VersionProvider:
@@ -10,114 +10,140 @@ class VersionProvider:
         self.versions: list[str] = [
             version["id"] for version in version_manifest.all_versions()
         ]
-        self.page_index: int = 0
-        self.highlight_index: int = 0
+        self.highlight_index = 0
+        self.index_within_view = 0
+        self.query = ""
 
-    def get_page(self, n: int) -> list[str]:
-        return self.versions[n * 20 : (n + 1) * 20]
+    def select(self, index: int) -> None:
+        start, end = self.visible_range
 
-    @property
-    def page(self) -> list[str]:
-        return self.get_page(self.page_index)
+        self.highlight_index = index
 
-    @property
-    def page_count(self) -> int:
-        version_count = len(self.versions)
-
-        if version_count % 20 == 0:
-            return version_count // 20
+        if index < start:
+            if index >= 5:
+                self.index_within_view = 5
+            else:
+                self.index_within_view = index
+        elif index > end:
+            if index <= len(self.versions) - 6:
+                self.index_within_view = 14
+            else:
+                self.index_within_view = 14 + len(self.filtered_versions) - 1 - index
         else:
-            return version_count // 20 + 1
-
-    def next_page(self) -> None:
-        if self.page_index < self.page_count - 1:
-            self.page_index += 1
-
-    def previous_page(self) -> None:
-        if self.page_index > 0:
-            self.page_index -= 1
+            self.index_within_view = index - start
 
     def scroll_down(self) -> None:
-        if self.highlight_index < len(self.page) - 1:
+        if self.highlight_index < len(self.filtered_versions):
             self.highlight_index += 1
+
+            if (
+                self.index_within_view < 14
+                or self.highlight_index >= len(self.filtered_versions) - 6
+            ):
+                self.index_within_view += 1
 
     def scroll_up(self) -> None:
         if self.highlight_index > 0:
             self.highlight_index -= 1
 
-
-class VersionListItem(Widget):
-    def __init__(self, value: str, on_click: Callable[[str], None], **args):
-        super().__init__(**args)
-        self.value = value
-        self.on_click = on_click
-        self._selected = False
+            if self.index_within_view > 5 or self.highlight_index <= 5:
+                self.index_within_view -= 1
 
     @property
-    def selectables_length(self) -> int:
-        if len(self.value) > 0:
-            return 1
+    def visible_versions(self) -> list[str]:
+        start, end = self.visible_range
+
+        return self.filtered_versions[start:end]
+
+    @property
+    def visible_range(self) -> Tuple[int, int]:
+        start = self.highlight_index - self.index_within_view
+        end = (
+            start + 20
+            if len(self.filtered_versions) >= 20
+            else len(self.filtered_versions)
+        )
+
+        return (start, end)
+
+    @property
+    def selected_version(self) -> str | None:
+        if len(self.filtered_versions) > 0:
+            return self.filtered_versions[self.highlight_index]
         else:
-            return 0
+            return None
 
-    def select(self, index: Union[int, None] = None) -> None:
-        self._selected = index is not None
+    @property
+    def query(self) -> str:
+        return self._query
 
-    def get_lines(self) -> list[str]:
-        if self._selected:
-            return [tim.parse(f"[bold]{self.value}")]
-        else:
-            return [self.value]
-
-    def handle_key(self, key: str) -> bool:
-        if key == keys.ENTER:
-            self.on_click(self.value)
-            return True
-        else:
-            return False
+    @query.setter
+    def query(self, query: str) -> None:
+        self._query = query
+        self.filtered_versions = [
+            version for version in self.versions if query in version
+        ]
+        self.highlight_index = 0
+        self.index_within_view = 0
 
 
-class VersionList(Container):
+class VersionList(Widget):
     def __init__(
         self, version_provider: VersionProvider, on_select: Callable[[str], None]
     ) -> None:
-        super().__init__()
+        super().__init__(parent_align=HorizontalAlignment.LEFT)
 
-        # Set up state management
         self.version_provider = version_provider
 
-        # Initialise the sub-widgets
-        self.labels: list[VersionListItem] = [
-            VersionListItem(version, on_select, parent_align=0)
-            for version in self.version_provider.page
-        ]
+        self.on_select = on_select
 
-        previous_button: Widget = Button("<", onclick=lambda _: self.previous())
-        next_button: Widget = Button(">", onclick=lambda _: self.next())
+    def get_lines(self) -> list[str]:
+        versions = self.version_provider.visible_versions
 
-        self.button_wrapper: Widget = Splitter(previous_button, next_button)
+        return [
+            (
+                tim.parse(f"[bold]{version}")
+                if version == self.version_provider.selected_version
+                else version
+            )
+            for version in versions
+        ] + [self.version_provider.query]
 
-        # Populate the sub-widgets with content
-        self._update_content()
+    def handle_key(self, key: str) -> bool:
+        if super().handle_key(key):
+            return True
 
-        # Insert the sub-widgets
-        self.set_widgets(cast(list[Widget], self.labels) + [self.button_wrapper])
+        if key in "abcdefghijklmnopqrstuvwxyz1234567890.-_()/":
+            self.version_provider.query += key
+        elif key == keys.BACKSPACE:
+            self.version_provider.query = self.version_provider.query[
+                : (
+                    len(self.version_provider.query) - 1
+                    if len(self.version_provider.query) > 0
+                    else 0
+                )
+            ]
+        elif key == keys.UP:
+            self.version_provider.scroll_up()
+            return False
+        elif key == keys.DOWN:
+            self.version_provider.scroll_down()
+            return False
+        elif key == keys.ENTER:
+            selected_version = self.version_provider.selected_version
 
-    def _update_content(self) -> None:
-        page = self.version_provider.page
-
-        for i in range(len(self.labels)):
-            if i < len(page):
-                self.labels[i].value = page[i]
-                self.labels[i]._selectables_length = 1
+            if selected_version is not None:
+                self.on_select(selected_version)
+                return False
             else:
-                self.labels[i]._selectables_length = 0
-                self.labels[i].value = ""
+                return True
 
-    def previous(self) -> None:
-        self.version_provider.previous_page()
-        self._update_content()
+        return True
 
-    def next(self) -> None:
-        self.version_provider.next_page()
-        self._update_content()
+    @property
+    def selectables_length(self) -> int:
+        return len(self.version_provider.versions)
+
+    def select(self, index: int | None = None) -> None:
+        if index is not None:
+            self.version_provider.highlight_index = index
