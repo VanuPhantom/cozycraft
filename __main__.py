@@ -6,6 +6,7 @@ from versions import VersionList, VersionProvider
 version_provider = VersionProvider()
 selected_version = None
 
+
 class FixedWindowManager(ptg.WindowManager):
     def __init__(self, **args):
         super().__init__(**args)
@@ -13,6 +14,7 @@ class FixedWindowManager(ptg.WindowManager):
     def on_resize(self, size):
         if self._is_running:
             super().on_resize(size)
+
 
 with FixedWindowManager(autorun=False) as manager:
     selector_window = ptg.Window()
@@ -26,9 +28,7 @@ with FixedWindowManager(autorun=False) as manager:
     manager.layout.add_slot("Body")
 
     selector_window.set_widgets([VersionList(version_provider, on_select)])
-    manager.add(
-            selector_window
-    )
+    manager.add(selector_window)
     manager.run()
 
 if selected_version is not None:
@@ -37,4 +37,3 @@ if selected_version is not None:
     print("\r\nThanks for using Cozycraft. Goodbye!")
 else:
     print(f"\r\nNo version selected. Exiting...")
-
