@@ -2,6 +2,7 @@ from portablemc.standard import (
     DownloadCompleteEvent,
     DownloadProgressEvent,
     DownloadStartEvent,
+    JarFoundEvent,
     Version,
     Watcher,
 )
@@ -15,6 +16,9 @@ selected_version = None
 
 
 class ProgressWatcher(Watcher):
+    def __init__(self, version_id: str):
+        self.version_id = version_id
+
     def handle(self, event) -> None:
         if isinstance(event, DownloadStartEvent) and event.size is not None:
             self.bar = Bar(
@@ -27,11 +31,14 @@ class ProgressWatcher(Watcher):
             and event.entry.size is not None
             and hasattr(self, "bar")
         ):
+            self.bar.message = f"Downloading {event.entry.name}"
             self.bar.suffix = f"{event.size // 1_000}/{event.entry.size // 1_000} kb"
             self.bar.max = event.entry.size // 1_000
             self.bar.goto(event.size // 1_000)
         elif isinstance(event, DownloadCompleteEvent) and hasattr(self, "bar"):
             self.bar.finish()
+        elif isinstance(event, JarFoundEvent):
+            print(f"Jar file for {self.version_id} found")
 
 
 class FixedWindowManager(ptg.WindowManager):
@@ -60,7 +67,7 @@ with FixedWindowManager(autorun=False) as manager:
 
 if selected_version is not None:
     print(f"\r\nLaunching {selected_version}")
-    Version(selected_version).install(watcher=ProgressWatcher()).run()
+    Version(selected_version).install(watcher=ProgressWatcher(selected_version)).run()
     print("\r\nThanks for using Cozycraft. Goodbye!")
 else:
     print(f"\r\nNo version selected. Exiting...")
