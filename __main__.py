@@ -62,6 +62,8 @@ with FixedWindowManager(autorun=False) as manager:
     manager.layout.add_slot("Body")
 
     selector_window.set_widgets([VersionList(version_provider, on_select)])
+    selector_window.select(1)
+
     manager.add(selector_window)
     manager.run()
 

@@ -46,7 +46,7 @@ class VersionProvider:
         if self.highlight_index > 0:
             self.highlight_index -= 1
 
-            if self.index_within_view > 5 or self.highlight_index <= 5:
+            if self.index_within_view > 5 or self.highlight_index < 5:
                 self.index_within_view -= 1
 
     @property
